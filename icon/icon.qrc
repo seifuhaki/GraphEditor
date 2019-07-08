@@ -1,0 +1,25 @@
+<RCC>
+    <qresource prefix="/">
+        <file>add.png</file>
+        <file>close.png</file>
+        <file>cut.png</file>
+        <file>ellipse.png</file>
+        <file>image.png</file>
+        <file>line.png</file>
+        <file>mosaic.png</file>
+        <file>open.png</file>
+        <file>recover.png</file>
+        <file>rectangle.png</file>
+        <file>revert.png</file>
+        <file>save.png</file>
+        <file>saveas.png</file>
+        <file>setting.png</file>
+        <file>text.png</file>
+        <file>combobox.png</file>
+        <file>move.png</file>
+        <file>translation.png</file>
+        <file>eraser.png</file>
+        <file>pen.png</file>
+        <file>color.png</file>
+    </qresource>
+</RCC>

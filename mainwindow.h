@@ -14,6 +14,7 @@
 #include<QPoint>
 #include<QColor>
 #include<QColorDialog>
+#include "imageqlabel.h"
 namespace Ui {
 class MainWindow;
 }
@@ -30,7 +31,7 @@ private:
 
     QDockWidget *dock_center;
     QString current_path_;
-
+    ImageQLabel *imgLabel;
 };
 
 #endif // MAINWINDOW_H

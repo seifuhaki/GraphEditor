@@ -25,10 +25,14 @@ DEFINES += QT_DEPRECATED_WARNINGS
 CONFIG += c++11
 
 SOURCES += \
+        imageqlabel.cpp \
+        layer.cpp \
         main.cpp \
         mainwindow.cpp
 
 HEADERS += \
+        imageqlabel.h \
+        layer.h \
         mainwindow.h
 
 FORMS += \

@@ -27,12 +27,18 @@ CONFIG += c++11
 SOURCES += \
         imageqlabel.cpp \
         layer.cpp \
+        layerbasic.cpp \
+        layerdelegate.cpp \
+        layergroup.cpp \
         main.cpp \
         mainwindow.cpp
 
 HEADERS += \
         imageqlabel.h \
         layer.h \
+        layerbasic.h \
+        layerdelegate.h \
+        layergroup.h \
         mainwindow.h
 
 FORMS += \

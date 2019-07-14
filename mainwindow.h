@@ -17,6 +17,7 @@
 #include "layergroup.h"
 #include "imageqlabel.h"
 #include "layerbasic.h"
+#include "layertableview.h"
 namespace Ui {
 class MainWindow;
 }
@@ -53,6 +54,7 @@ private:
     QDockWidget *dock_center;
     QString current_path_;
     ImageQLabel *imgLabel;
+    LayerTableView *layer_table_;
     qreal zoom_level_=1.0;
     void InitImage();
     void InitLayerView();
@@ -74,10 +76,26 @@ private slots:
     void MoveSlot(QPoint startpoint,QPoint endpoint);
     void ChangeCurrentLayer(int index);
     void SetPainterColor(QColor);
+    void Lines();
+    void Circles();
+    void Rect();
+    void Tailor();
+    void Erase();
+    void Blur();
+    void Hist();
     void Rotate90();
     void AntiRotate90();
     void Rotate();
     void Resize();
+    void CallColorDialog();
+    void Translation();
+    void RemoveLayer(int);
+    void ResortLayer(int,int);
+    void CreateLayer();
+    void TrunH();
+    void TrunV();
+    void Filter();
+    void UsePainter();
 };
 
 #endif // MAINWINDOW_H

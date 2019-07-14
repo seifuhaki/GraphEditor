@@ -18,8 +18,6 @@ LayerTableView::LayerTableView(vector<Layer *> *layerlist,QWidget *parent)
     this->horizontalHeader()->setVisible(true);
     this->resizeColumnsToContents();
     this->resizeRowsToContents();
-    /*this->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    this->setSelectionBehavior(QAbstractItemView::SelectRows);*/
     this->setMouseTracking(true);//important
 
     //When click on the checkbox it will emit signal twice.Click on the cell emit only once.

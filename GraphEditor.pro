@@ -30,6 +30,8 @@ SOURCES += \
         layerbasic.cpp \
         layerdelegate.cpp \
         layergroup.cpp \
+        layertablemodel.cpp \
+        layertableview.cpp \
         main.cpp \
         mainwindow.cpp
 
@@ -39,6 +41,8 @@ HEADERS += \
         layerbasic.h \
         layerdelegate.h \
         layergroup.h \
+        layertablemodel.h \
+        layertableview.h \
         mainwindow.h
 
 FORMS += \

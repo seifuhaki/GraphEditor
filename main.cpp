@@ -3,12 +3,14 @@
 #include <QSplashScreen>
 #include <QElapsedTimer>
 #include <QTranslator>
-//#include "layergroup.h"
 
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
-
+    QTranslator translator; //新建翻译类
+    translator.load(":/resources/PhotoStall_zh_CN"); //导入生成的文件
+    a.installTranslator(&translator); //装入
+    //皮肤！
     QFile qss(":/main.qss");
 
     qss.open(QFile::ReadOnly);

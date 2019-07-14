@@ -1,0 +1,14 @@
+version: build{build}
+
+branches:
+	except:
+		- project/travis
+
+environment:
+	matrix:
+	-name: win64
+	  platform: amd64_x86
+	  qt:msvc2017
+
+build_script:
+	-call 

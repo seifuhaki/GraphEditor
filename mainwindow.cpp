@@ -23,6 +23,13 @@ MainWindow::MainWindow(QWidget *parent) :
     tabifyDockWidget(ui->dock_geometry, ui->dock_special);
 
     ui->dock_geometry->raise();             //指定窗口置于最前
+
+    ConnectFile();
+    InitImage();        // 初始化图像QLabel
+    InitLayerView();
+    ConnectAction();    // Initialize the action connection
+    ConnectLayer();
+
     //皮肤！
     QFile styleSheet("./qss/main.qss");
     if (!styleSheet.open(QIODevice::ReadOnly))
@@ -37,7 +44,6 @@ MainWindow::~MainWindow()
 {
     delete ui;
 }
-
 void MainWindow::ConnectFile()
 {
     connect(ui->action_new, SIGNAL(triggered()), this, SLOT(NewFile()));
@@ -159,4 +165,369 @@ void MainWindow::SaveasFile()
         img.save(path);
         current_path_ = path;
     }
+}
+void MainWindow::RefreshView()
+{
+    if (layer_group_==nullptr) imgLabel->clear();
+    else {
+        QImage preview = layer_group_->get_preview();
+        imgLabel->SetPreview(QPixmap::fromImage(preview));
+        imgLabel->RefreshView();
+    }
+}
+void MainWindow::ChangeCurrentLayer(int index){
+    vector<Layer *> *layerlist =&layer_group_->get_vec_layer();
+    if (!layerlist||index>=layerlist->size()) return;
+    current_layer_ = layerlist->at(index);
+}
+void MainWindow::RemoveLayer(int index){
+    layer_group_->remove(layer_group_->get_vec_id().at(index));
+    RefreshView();
+}
+void MainWindow::ResortLayer(int index1,int index2){
+    vector<int> vec_id=layer_group_->get_vec_id();
+    swap(vec_id[index1],vec_id[index2]);
+    layer_group_->reorder(vec_id);
+    layer_table_->RefreshTable();
+    RefreshView();
+}
+void MainWindow::CreateLayer() {
+    Layer new_layer;
+    new_layer.create(tr("Untitled Layer").toStdString(),OPAQUE,layer_group_->get_maxWidth(),layer_group_->get_maxHeight());
+    new_layer.clear_valued();
+    layer_group_->insert(new_layer);
+    layer_table_->RefreshTable();
+    RefreshView();
+}
+void MainWindow::wheelEvent(QWheelEvent *event)
+{
+    if (QApplication::keyboardModifiers()==Qt::ControlModifier){
+        qreal delta_level = event->angleDelta().y();
+        delta_level/=8*360;
+        imgLabel->SetZoomLevel(delta_level);
+    }
+}
+void MainWindow::DragSlot(QPoint startpoint,QPoint endpoint)
+{
+    QPoint delta = endpoint - startpoint;
+    Point s,e;
+
+    s.x=startpoint.x();
+    s.y=startpoint.y();
+    e.x=endpoint.x();
+    e.y=endpoint.y();
+    double zoom_level = imgLabel->GetZoomLevel();
+    s/=zoom_level;
+    e/=zoom_level;
+    s.x-=current_layer_->get_minCol();
+    e.x-=current_layer_->get_minCol();
+    s.y-=current_layer_->get_minRow();
+    e.y-=current_layer_->get_minRow();
+    if(s.x>e.x)
+    {
+        rect.x=e.x;
+    }
+    else
+    {
+        rect.x=s.x;
+    }
+    if(s.y<e.y)
+    {
+        rect.y=s.y;
+    }
+    else
+    {
+        rect.y=e.y;
+    }
+    rect.height=abs(s.y-e.y);
+    rect.width=abs(e.x-s.x);
+
+    switch (action_mode_)
+    {
+    case DRAG_PREVIEW:
+        Scroll(delta);
+        break;
+    case DRAW_LINES:
+        if(ui->comboBox_mode->currentIndex()==0)
+        {
+            DrawType.layerLine(*current_layer_,s,e,painter_color_,1,ui->combox_pensize->currentIndex()+1);
+        }
+        else if(ui->comboBox_mode->currentIndex()==1)
+        {
+            DrawType.layerLine(*current_layer_,s,e,Scalar(255),0,ui->combox_pensize->currentIndex()+1);
+        }
+        RefreshView();
+        break;
+    case DRAW_CIRCLE:
+        if(ui->comboBox_mode->currentIndex()==0)
+        {
+            if(ui->comboBox_solid->currentIndex()==0)
+            {
+                DrawType.layerCircle(*current_layer_,s,(int)sqrt((s.x-e.x)*(s.x-e.x)+(s.y-e.y)*(s.y-e.y)),painter_color_,1,ui->combox_pensize->currentIndex()+1);
+            }
+            else if(ui->comboBox_solid->currentIndex()==1)
+            {
+                DrawType.layerCircle(*current_layer_,s,(int)sqrt((s.x-e.x)*(s.x-e.x)+(s.y-e.y)*(s.y-e.y)),painter_color_,1,-1);
+            }
+
+        }
+        else if(ui->comboBox_mode->currentIndex()==1)
+        {
+            DrawType.layerCircle(*current_layer_,s,(int)sqrt((s.x-e.x)*(s.x-e.x)+(s.y-e.y)*(s.y-e.y)), Scalar(255),0);
+        }
+        RefreshView();
+        break;
+    case DRAW_RECT:
+        if(ui->comboBox_mode->currentIndex()==0)
+        {
+            if(ui->comboBox_solid->currentIndex()==0)
+            {
+                DrawType.layerRect(*current_layer_, rect, painter_color_, 1, ui->combox_pensize->currentIndex()+1);
+            }
+            else if(ui->comboBox_solid->currentIndex()==1)
+            {
+                DrawType.layerRect(*current_layer_,rect,painter_color_, 1,-1);
+            }
+        }
+        else if(ui->comboBox_mode->currentIndex()==1)
+        {
+            DrawType.layerRect(*current_layer_,rect,Scalar(255),0);
+        }
+
+        RefreshView();
+        break;
+    case TAILOR:
+        DrawType.layerTailoring(*current_layer_, rect);
+        RefreshView();
+        break;
+    case ERASE_RECT:
+        DrawType.layerRect(*current_layer_,rect,Scalar(255),0);
+        RefreshView();
+        break;
+    case ERASE_CIRCLE:
+        DrawType.layerCircle(*current_layer_,s,(int)sqrt((s.x-e.x)*(s.x-e.x)+(s.y-e.y)*(s.y-e.y)), Scalar(255),0);
+        RefreshView();
+        break;
+    case TRANSLATION:
+        DrawType.layerTranslation(*current_layer_,e.x-s.x,e.y-s.y);
+        RefreshView();
+        break;
+    default:
+        RefreshView();
+        break;
+    }
+}
+void MainWindow::MoveSlot(QPoint startpoint,QPoint endpoint){
+    QPoint delta = endpoint - startpoint;
+    int pen_size = ui->combox_pensize->currentIndex()+1;
+    Point s,e;
+    s.x=startpoint.x();
+    s.y=startpoint.y();
+    e.x=endpoint.x();
+    e.y=endpoint.y();
+    double zoom_level = imgLabel->GetZoomLevel();
+    s/=zoom_level;
+    e/=zoom_level;
+    s.x-=current_layer_->get_minCol();
+    e.x-=current_layer_->get_minCol();
+    s.y-=current_layer_->get_minRow();
+    e.y-=current_layer_->get_minRow();
+    switch (action_mode_) {
+    case PAINTER:
+        DrawType.layerLine(*current_layer_,s,e,painter_color_,1,pen_size);
+        break;
+    case ERASE:
+        DrawType.layerLine(*current_layer_,s,e,Scalar(255),0,pen_size);
+        break;
+    default:
+        break;
+    }
+}
+void MainWindow::Scroll(QPoint delta)
+{
+    QScrollBar* h_bar = scroll_area_->horizontalScrollBar();
+    QScrollBar* v_bar = scroll_area_->verticalScrollBar();
+    qDebug()<<"h_bar: "<<h_bar->value()<<",v_bar: "<<v_bar->value()<<"delta: "<<delta<<endl;
+    h_bar->setValue(h_bar->value()-delta.x());
+    v_bar->setValue(v_bar->value()-delta.y());
+}
+
+void MainWindow::keyPressEvent(QKeyEvent * event)
+{
+    if (event->key()==Qt::Key_0&&QApplication::keyboardModifiers()==Qt::ControlModifier){
+        imgLabel->ResetZoom();
+    }
+}
+
+void MainWindow::Translation()
+{
+    if(action_mode_!=TRANSLATION) action_mode_ = TRANSLATION;
+    else action_mode_ = NO_ACTION;
+}
+
+//直线
+void MainWindow::Lines()
+{
+    if (action_mode_!=DRAW_LINES) action_mode_ = DRAW_LINES;
+    else action_mode_ = NO_ACTION;
+}
+
+//圆
+void MainWindow::Circles()
+{
+    if(action_mode_==ERASE)
+    {
+        action_mode_ = ERASE_CIRCLE;
+    }
+    else if (action_mode_!=DRAW_CIRCLE) action_mode_ = DRAW_CIRCLE;
+    else action_mode_ = NO_ACTION;
+}
+
+//方形
+void MainWindow::Rect()
+{   if(action_mode_==ERASE)
+    {
+        action_mode_ = ERASE_RECT;
+    }
+    else if (action_mode_!=DRAW_RECT) action_mode_ = DRAW_RECT;
+    else action_mode_ = NO_ACTION;
+}
+
+//裁剪
+void MainWindow::Tailor()
+{
+    if (action_mode_!=TAILOR) action_mode_ = TAILOR;
+    else action_mode_ = NO_ACTION;
+}
+
+//橡皮
+void MainWindow::Erase()
+{
+    if (action_mode_!=ERASE) action_mode_ = ERASE;
+    else action_mode_ = NO_ACTION;
+}
+
+//橡皮
+void MainWindow::UsePainter()
+{
+    if (action_mode_!=PAINTER) action_mode_ = PAINTER;
+    else action_mode_ = NO_ACTION;
+}
+
+//滤波
+void MainWindow::Blur()
+{   if(ui->comboBox__filter_2->currentIndex()==0)
+    {
+        DrawType.layerBlur(*current_layer_);
+    }
+    else if(ui->comboBox__filter_2->currentIndex()==1)
+    {
+        DrawType.layerGaussBlur(*current_layer_);
+    }
+    else if(ui->comboBox__filter_2->currentIndex()==2)
+    {
+        DrawType.layerMedianBlur(*current_layer_);
+    }
+    else if(ui->comboBox__filter_2->currentIndex()==3)
+    {
+        DrawType.layerMedianBlur(*current_layer_);
+    }
+    RefreshView();
+}
+
+//直方图
+void MainWindow::Hist()
+{
+    cv::namedWindow("Histogram");
+    cv::imshow("Histogram",DrawType.layerShowHist(*current_layer_));
+}
+
+//旋转
+void MainWindow::Rotate90()
+{
+    DrawType.layerRotate(*current_layer_,-90);
+    RefreshView();
+}
+
+void MainWindow::AntiRotate90()
+{
+    DrawType.layerRotate(*current_layer_,90);
+    RefreshView();
+}
+
+void MainWindow::Rotate()
+{
+    QString str = ui->lineEdit_degree->text();
+    double num = str.toDouble();
+    if(ui->comboBox_direction->currentIndex()==1)
+    {
+        DrawType.layerRotate(*current_layer_,num);
+    }
+    else if(ui->comboBox_direction->currentIndex()==0)
+    {
+        DrawType.layerRotate(*current_layer_,-num);
+    }
+    RefreshView();
+}
+
+//缩放
+void MainWindow::Resize()
+{
+    DrawType.layerResize(*current_layer_,ui->doubleSpinBox_length->value(),ui->doubleSpinBox_width->value());
+    RefreshView();
+}
+
+void MainWindow::CallColorDialog(){
+    QColorDialog *dlg = new QColorDialog(QColor(painter_color_[2],painter_color_[1],painter_color_[0]));
+    connect(dlg,SIGNAL(colorSelected(QColor)),this,SLOT(SetPainterColor(QColor)));
+    dlg->exec();
+}
+
+void MainWindow::SetPainterColor(QColor new_color) {
+    painter_color_ = Scalar(new_color.blue(),new_color.green(),new_color.red());
+}
+
+//水平翻转
+void MainWindow::TrunH()
+{
+    DrawType.layerFlip(*current_layer_,1);
+    RefreshView();
+}
+
+//竖直翻转
+void MainWindow::TrunV()
+{
+    DrawType.layerFlip(*current_layer_,0);
+    RefreshView();
+}
+
+void MainWindow::Filter()
+{
+    if(ui->comboBox__filter->currentIndex()==5)
+    {
+        DrawType.layerBlackWhite(*current_layer_);
+    }
+    else if(ui->comboBox__filter->currentIndex()==4)
+    {
+        DrawType.layerNostalgic(*current_layer_);
+    }
+    else if(ui->comboBox__filter->currentIndex()==3)
+    {
+        ui->horizontalSlider_filter->setMinimum(0);
+        ui->horizontalSlider_filter->setMaximum(100);
+        ui->horizontalSlider_filter->setSingleStep(10);
+        DrawType.layerEclosion(*current_layer_,(float)ui->horizontalSlider_filter->value()/100);
+    }
+    else if(ui->comboBox__filter->currentIndex()==2)
+    {
+        DrawType.layerDiffusion(*current_layer_);
+    }
+    else if(ui->comboBox__filter->currentIndex()==1)
+    {
+        ui->horizontalSlider_filter->setMinimum(0);
+        ui->horizontalSlider_filter->setMaximum(100);
+        ui->horizontalSlider_filter->setSingleStep(10);
+        DrawType.layerZoomBlur(*current_layer_,ui->horizontalSlider_filter->value());
+    }
+    RefreshView();
 }

@@ -1,0 +1,152 @@
+图像编辑器--------分报告
+====
+一.	分工任务与解决方案
+---------
+### 1.图层类（Layer.h/cpp）Common Layer
+图层类由以下成员组成：<br>
+``` 
+1. private: 
+2.    string name; 
+3.    int id; 
+4.    Transparency visionType;
+5.    bool visibility;
+6.    int width, height;
+7.    int minRow, minCol;
+8.    double angle;
+9. Mat M, valued, thumbNail;
+10. public:
+11.   static int layerCount;
+12.   friend class LayerGroup;
+13.   friend class LayerBasic;
+```
+* name为图层名；<br>
+* id为图层编号；<br>
+* visionType为一名为Transparency的enum，内含两种值TRANSPARENT和OPAQUE，前者表示图层只有valued为1的像素会被渲染；后者表示图层所有像素都会被渲染；<br>
+* visibility表示该图层是否会被渲染；<br>
+* width、height表示该图层的宽和高，与Mat同步；<br>
+* minRow，minCol表示该图层在画布上左下角点的坐标；<br>
+* angle表示该图层被旋转的角度；<br>
+* M表示该图层的像素矩阵；<br>
+* valued表示该图层的为一个像素点是否要被渲染，对于OPAQUE类型的图层来说这个成员的值没有意义；<br>
+* thumbNail表示该图层的缩略图，用于在图层列表中显示；<br>
+* 静态变量layerCount表示通过非拷贝构造函数创建的图层数，用于给图层提供一一对应的编号；<br>
+* LayerGroup是图层组合类；<br>
+* LayerBasic是图层操作类。<br>
+
+Layer类提供了以下构造函数，create函数和析构函数。
+```
+1. Layer();
+2. ~Layer();
+3. Layer(Layer& l);
+4. Layer(string FILE_PATH, string name, Transparency visionType, bool visibility = 1, int minRow = 0, int minCol = 0);
+5. Layer(string name, Transparency visionType, int width, int height, bool visibility, int minRow, int minCol, Mat M);
+6. Layer& operator= (Layer& l);
+7. void create(string FILE_PATH, string name, Transparency visionType, bool visibility = 1, int minRow = 0, int minCol = 0);
+8. void create(Mat M, string name, Transparency visionType, bool visibility = 1, int minRow = 0, int minCol = 0);
+9. void create(string name, Transparency visionType = OPAQUE, int width = 0, int height = 0, bool visibility = 1, int minRow = 0, int minCol = 0);
+```
+其中拷贝构造函数和重载运算符“=”采用深拷贝，函数实体如下：
+```
+1. Layer::Layer(Layer& l)
+2. {
+3.  this->name = l.name;
+4.  this->visionType = l.visionType;
+5.  this->visibility = l.visibility;
+6.  this->minCol = l.minCol;
+7.  this->minRow = l.minRow;
+8.  this->width = l.width;
+9.  this->height = l.height;
+10. this->id = l.id;
+11. this->angle = l.angle;
+12. this->M = l.M.clone();
+13. this->valued = l.valued.clone();
+14. }
+15.
+16. Layer& Layer::operator= (Layer& l)
+17. {
+18. this->name = l.name;
+19. this->visionType = l.visionType;
+20. this->visibility = l.visibility;
+21. this->minCol = l.minCol;
+22. this->minRow = l.minRow;
+23. this->width = l.width;
+24. this->height = l.height;
+25. this->id = l.id;
+26. this->M = l.M.clone();
+27. this->valued = l.valued.clone();
+28. this->angle = l.angle;
+29.
+30. return *this;
+31. }
+```
+给成员变量提供了存取接口.<br>
+
+同时提供了两个与前端交互的接口，将后端图像处理用的opencv的Mat类与Qt用于显示的图像QImage进行沟通，一个用于显示大图，一个用于显示缩略图：
+```
+1. QImage toQImage_ref(QImage::Format format) {
+2.
+3.    return QImage(M.data, M.cols, M.rows, static_cast<int>(M.step), format);
+4.  }
+5.
+6. QImage Layer::getThumbNail(int width, int height)
+7.  {
+8.    resize(M, thumbNail, Size(width, height), 0, 0, INTER_NEAREST);
+9.    return QImage(thumbNail.data, thumbNail.cols, thumbNail.rows, static_cast<int>(thumbNail.step), QImage::Format_RGB888).rgbSwapped();
+10. }
+```
+### 2.图层列表的model/view框架
+    为了实现能够显示预览图、能够设置可见性、非透明性、更改图层名字、调整图层顺序的复杂功能；我采用了Qt中独具特色的Model/View框架。Model/View框<br>
+架的核心思想是模型（数据）与视图（显示）相分离，模型对外提供标准接口存取数据，不关心数据如何显示，视图自定义数据的显示方式，不关心数据如何组织存储。
+    Model/View框架中数据与显示的分离，可以允许使用不同界面显示同一数据，也能够在不改变数据的情况下添加新的显示界面。为了处理用户输入，引入了<br>
+委托（delegate）。引入委托的好处是可以自定义数据项的渲染和编辑。
+    由于实现的图层列表与表格的形式类似。此处我们的model/view框架是基于QAbstratTableModel实现的。在编写过程中我参考了Qt的官方文档demo与相关博
+客文章。下面简要给出三个类的头文件与部分函数实现。
+```
+#ifndef LAYERTABLEMODEL_H
+#define LAYERTABLEMODEL_H
+#include"layer.h"
+#include<QAbstractTableModel>
+#include<QObject>
+#include<QList>
+class LayerTableModel : public QAbstractTableModel
+{
+Q_OBJECT
+public:
+int rowCount(const QModelIndex &parent) const;
+int rowCount() const;
+int columnCount(const QModelIndex &parent) const;
+LayerTableModel(vector<Layer*> *layerlist = nullptr);
+~LayerTableModel();
+QVariant data(const QModelIndex &index, int role) const;
+QVariant headerData(int section,
+Qt::Orientation orientation,
+int role = Qt::DisplayRole) const;
+Qt::ItemFlags flags(const QModelIndex &index) const;
+bool setData(const QModelIndex &index, const QVariant &value, int role);
+void deleteItem(int index);
+void addItem();
+void refreshModel();
+QModelIndex selecttedIndex(int row);
+void setSelecttedRow(int row);
+int getSelecttedRow() const;
+public slots:
+void changeLayerVisibility(const QModelIndex&);
+void changeLayerVisionType(const QModelIndex&);
+private:
+vector<Layer*> *layerlist;
+int selectedRow;
+```
+LayerListModel所对应的底层数据是由LayerGroup中中的Layer指针列表得来的；采用指针的方式方便数据模型中行数据对应到每一个图层，调用各个属性的set<br>
+和get方法可以安全规范地对图层的属性进行操作
+到了最后就视图类LayerListView的定义了，由于只有LayerListView是直接作为MainWindow的成员变量进行建立的，因此我们需要向主窗口内发送的signals以及<br>
+需要发送给LayerGroup的一些与数据编辑不太一样的signals，比如图层顺序的调整，则需要对视图类型添加一些信号和槽来对model/view模型与底层数据模型的<br>
+交互方式进行补充。
+
+二. 课程心得体会
+---------
+    通过暑期两个星期的学习，我学习到如何真正进行团队协作开发。以前的所有计算机专业的课程都要分小组完成一个大程序，但总让我感觉1+1+1<3，强行地分工让工作效率变得低下，同时还要处理与陌生人组员之间的联系。但这次暑期小学期课程，我学会了使用github+mvm的开发模式，同组员协作密切，配合紧密，虽然第一次使用还是有点生疏，但已经初步掌握了mvm模式。这次我们小组编写了一个图片编辑器，通过将图片放置于重叠摆放的图层上，可以对图片进行一系列的处理，本次我的分工是做common,model,view层，创建了基本的layer类，与tablemodel,tableview类。
+
+三. 对课程改进意见
+---------
+     机房的网络太差啦，人多的时候就只能手机开热点。 老师的课程ppt可以做的再详细一点，让我们在刚开始接触这门课程的时候能更快的了解这门课程所要学习的内容。 老师人很好，很细心，也很关心我们每个小组的进展情况。    
+
